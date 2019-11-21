@@ -1,0 +1,23 @@
+{
+  "name": "scratweet",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jblancogl/scratweet.git"
+  },
+  "author": "javi blanco",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jblancogl/scratweet/issues"
+  },
+  "homepage": "https://github.com/jblancogl/scratweet#readme",
+  "dependencies": {
+    "luxon": "^1.21.2",
+    "puppeteer": "^2.0.0",
+    "secure-random-user-agent": "^2.0.1",
+    "yargs": "^15.0.2"
+  }
+}
