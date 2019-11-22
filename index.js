@@ -13,8 +13,8 @@ async function getProfile (page) {
       const bio = document.querySelector('.ProfileHeaderCard > p')
       const location = document.querySelector('.ProfileHeaderCard-locationText.u-dir')
       const url = document.querySelector('.ProfileHeaderCard-urlText.u-dir > a')
-      const avatar = document.querySelector('.ProfileCanopy-avatar > div > a > img').src
-      const background = document.querySelector('.ProfileCanopy-headerBg > img').src
+      const avatar = document.querySelector('.ProfileCanopy-avatar > div > a > img')
+      const background = document.querySelector('.ProfileCanopy-headerBg > img')
       const verified = document.querySelector('.ProfileHeaderCard > h1 > span > a > span')
       const tweets = document.querySelector('.ProfileNav-item--tweets > a > span.ProfileNav-value')
       const following = document.querySelector('.ProfileNav-item--following > a > span.ProfileNav-value')
@@ -29,8 +29,8 @@ async function getProfile (page) {
         bio: bio ? bio.innerText : '',
         location: location ? location.innerText : '',
         url: url ? url.title : '',
-        avatar: avatar,
-        background: background,
+        avatar: avatar ? avatar.src : '',
+        background: background ? background.src : '',
         verified: verified ? true : false,
         tweets: tweets ? Number(tweets.dataset.count) : 0,
         following: following ? Number(following.dataset.count) : 0,
@@ -94,52 +94,81 @@ function scroll (page, fn) {
   })
 }
 
-async function getUser (config) {
+async function getUser (config, depth = 0, blacklist = []) {
   try {
-    let args = [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--enable-features=NetworkService'
-    ]
+    console.log(config.username, depth, blacklist)
 
-    const browser = await puppeteer.launch({
-      defaultViewport: null,
-      headless: true,
-      args: args
-    })
-
-    const page = (await browser.pages())[0]
-
-    let profile = {}
-
-    if (config.profile) {
-      await page.goto(`https://twitter.com/${config.username}?lang=en&time=${Date.now()}`)
-      profile = await getProfile(page)
+    if (blacklist.includes(config.username)) {
+      return
     }
 
-    await page.setUserAgent(agent())
+    const filename = `./data/${config.username}.json`
+    let exists = true
 
-    let following = []
-
-    if (config.following) {
-      await page.goto(`https://mobile.twitter.com/${config.username}/following?lang=en`)
-      following = await scroll(page, getDataFromPage)
+    try {
+      await fs.promises.access(filename, fs.constants.F_OK)
+    } catch (e) {
+      exists = false
     }
 
-    let followers = []
-
-    if (config.followers) {
-      await page.goto(`https://mobile.twitter.com/${config.username}/followers?lang=en`)
-      followers = await scroll(page, getDataFromPage)
-    }
-
-    await browser.close()
-
-    return {
+    let data = {
       username: config.username,
-      followers: followers,
-      following: following,
-      profile: profile
+      profile: {},
+      following: [],
+      followers: []
+    }
+
+    if (exists) {
+      data = JSON.parse((await fs.promises.readFile(filename)))
+    } else {
+      let args = [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--enable-features=NetworkService'
+      ]
+
+      const browser = await puppeteer.launch({
+        defaultViewport: null,
+        headless: true,
+        args: args
+      })
+
+      if (depth >= 2) {
+        config.following = false
+        config.followers = false
+      }
+
+      const page = (await browser.pages())[0]
+
+      if (config.profile && !exists) {
+        await page.goto(`https://twitter.com/${config.username}?lang=en&time=${Date.now()}`)
+        data.profile = await getProfile(page)
+      }
+
+      await page.setUserAgent(agent())
+
+      if (config.following && !exists) {
+        await page.goto(`https://mobile.twitter.com/${config.username}/following?lang=en`)
+        data.following = await scroll(page, getDataFromPage)
+      }
+
+      if (config.followers && !exists) {
+        await page.goto(`https://mobile.twitter.com/${config.username}/followers?lang=en`)
+        data.followers = await scroll(page, getDataFromPage)
+      }
+
+      fs.promises.writeFile(filename, JSON.stringify(data, null, 2))
+
+      await browser.close()
+    }
+
+    blacklist.push(data.username)
+
+    if (data.following.length > 0) {
+      for (const username of data.following) {
+        config.username = username
+        await getUser(config, depth + 1, blacklist)
+      }
     }
   } catch (e) {
     console.log(e)
@@ -158,9 +187,7 @@ async function main (argv) {
     following: argv.following || false
   }
 
-  const user = await getUser(config)
-
-  console.log(user)
+  await getUser(config)
 }
 
 main(argv)
