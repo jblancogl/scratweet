@@ -96,8 +96,6 @@ function scroll (page, fn) {
 
 async function getUser (config, depth = 0, blacklist = []) {
   try {
-    console.log(config.username, depth, blacklist)
-
     if (blacklist.includes(config.username)) {
       return
     }
@@ -129,42 +127,34 @@ async function getUser (config, depth = 0, blacklist = []) {
 
       const browser = await puppeteer.launch({
         defaultViewport: null,
-        headless: true,
+        headless: false,
         args: args
       })
 
-      if (depth >= 2) {
-        config.following = false
-        config.followers = false
-      }
-
       const page = (await browser.pages())[0]
 
-      if (config.profile && !exists) {
-        await page.goto(`https://twitter.com/${config.username}?lang=en&time=${Date.now()}`)
-        data.profile = await getProfile(page)
-      }
+      await page.goto(`https://twitter.com/${config.username}?lang=en&time=${Date.now()}`)
+      data.profile = await getProfile(page)
 
       await page.setUserAgent(agent())
 
-      if (config.following && !exists) {
+      if (config.following) {
         await page.goto(`https://mobile.twitter.com/${config.username}/following?lang=en`)
         data.following = await scroll(page, getDataFromPage)
       }
 
-      if (config.followers && !exists) {
+      if (config.followers) {
         await page.goto(`https://mobile.twitter.com/${config.username}/followers?lang=en`)
         data.followers = await scroll(page, getDataFromPage)
       }
 
-      fs.promises.writeFile(filename, JSON.stringify(data, null, 2))
-
+      await fs.promises.writeFile(filename, JSON.stringify(data, null, 2))
       await browser.close()
     }
 
     blacklist.push(data.username)
 
-    if (data.following.length > 0) {
+    if (data.following.length > 0 && depth < config.depth) {
       for (const username of data.following) {
         config.username = username
         await getUser(config, depth + 1, blacklist)
@@ -181,8 +171,8 @@ async function main (argv) {
   }
 
   const config = {
+    depth: argv.depth || 2,
     username: argv.username,
-    profile: argv.profile || false,
     followers: argv.followers || false,
     following: argv.following || false
   }
