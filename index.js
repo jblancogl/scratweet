@@ -2,7 +2,7 @@ const puppeteer = require('puppeteer')
 const agent = require('secure-random-user-agent')
 const { DateTime } = require('luxon')
 const argv = require('yargs').argv
-const fs = require('fs')
+const fs = require('fs').promises
 
 async function getProfile (page) {
   try {
@@ -104,7 +104,7 @@ async function getUser (config, depth = 0, blacklist = []) {
     let exists = true
 
     try {
-      await fs.promises.access(filename, fs.constants.F_OK)
+      await fs.access(filename, fs.constants.F_OK)
     } catch (e) {
       exists = false
     }
@@ -127,7 +127,7 @@ async function getUser (config, depth = 0, blacklist = []) {
 
       const browser = await puppeteer.launch({
         defaultViewport: null,
-        headless: false,
+        headless: true,
         args: args
       })
 
@@ -148,13 +148,13 @@ async function getUser (config, depth = 0, blacklist = []) {
         data.followers = await scroll(page, getDataFromPage)
       }
 
-      await fs.promises.writeFile(filename, JSON.stringify(data, null, 2))
+      await fs.writeFile(filename, JSON.stringify(data, null, 2))
       await browser.close()
     }
 
     blacklist.push(data.username)
 
-    if (data.following.length > 0 && depth < config.depth) {
+    if (data.following.length > 0 && depth < config.depth - 1) {
       for (const username of data.following) {
         config.username = username
         await getUser(config, depth + 1, blacklist)
