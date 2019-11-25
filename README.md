@@ -1,13 +1,22 @@
-# scratweet
+## Scratweet
 
-## install
+Twitter scraping tool that doesn't use Twitter's API inspired by twintproject
 
-```bash
-npm install
+## Installation
+
+Via `npm`:
+
+```
+$ npm install
 ```
 
-## example
+## Example
 
-```bash
-node index.js --username username --profile --following
 ```
+node index.js --username username --depth 2 --following
+```
+
+---
+
+![](https://img.shields.io/badge/license-MIT-blue.svg)
+![](https://img.shields.io/badge/status-stable-green.svg)
