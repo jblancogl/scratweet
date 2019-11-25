@@ -2,7 +2,9 @@ const puppeteer = require('puppeteer')
 const agent = require('secure-random-user-agent')
 const { DateTime } = require('luxon')
 const argv = require('yargs').argv
+const fsConstants = require('fs').constants
 const fs = require('fs').promises
+const path = require('path')
 
 async function getProfile (page) {
   try {
@@ -68,8 +70,8 @@ async function getDataFromPage (page) {
   }
 }
 
-function scroll (page, fn) {
-  return new Promise((resolve, reject) => {
+async function scroll (page, fn) {
+  return new Promise(async (resolve, reject) => {
     try {
       const records = []
       const interval = setInterval(async () => {
@@ -87,27 +89,33 @@ function scroll (page, fn) {
         } catch (e) {
           reject(e)
         }
-      }, 600)
+      }, 1000)
     } catch (e) {
       reject(e)
     }
   })
 }
 
-async function getUser (config, depth = 0, blacklist = []) {
+async function fsExists (path) {
+  let exists = true
+
+  try {
+    await fs.access(path, fsConstants.F_OK)
+  } catch (e) {
+    exists = false
+  }
+
+  return exists
+}
+
+async function getUser (page, config, depth = 0, blacklist = []) {
   try {
     if (blacklist.includes(config.username)) {
       return
     }
 
-    const filename = `./data/${config.username}.json`
-    let exists = true
-
-    try {
-      await fs.access(filename, fs.constants.F_OK)
-    } catch (e) {
-      exists = false
-    }
+    const filename = path.join(config.dataFolder, `${config.username}.json`)
+    let isCached = await fsExists(filename)
 
     let data = {
       username: config.username,
@@ -116,23 +124,9 @@ async function getUser (config, depth = 0, blacklist = []) {
       followers: []
     }
 
-    if (exists) {
-      data = JSON.parse((await fs.promises.readFile(filename)))
+    if (isCached) {
+      data = JSON.parse((await fs.readFile(filename)))
     } else {
-      let args = [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--enable-features=NetworkService'
-      ]
-
-      const browser = await puppeteer.launch({
-        defaultViewport: null,
-        headless: true,
-        args: args
-      })
-
-      const page = (await browser.pages())[0]
-
       await page.goto(`https://twitter.com/${config.username}?lang=en&time=${Date.now()}`)
       data.profile = await getProfile(page)
 
@@ -149,7 +143,6 @@ async function getUser (config, depth = 0, blacklist = []) {
       }
 
       await fs.writeFile(filename, JSON.stringify(data, null, 2))
-      await browser.close()
     }
 
     blacklist.push(data.username)
@@ -157,28 +150,64 @@ async function getUser (config, depth = 0, blacklist = []) {
     if (data.following.length > 0 && depth < config.depth - 1) {
       for (const username of data.following) {
         config.username = username
-        await getUser(config, depth + 1, blacklist)
+        await getUser(page, config, depth + 1, blacklist)
       }
     }
   } catch (e) {
-    console.log(e)
+    throw new Error(e.message)
   }
 }
 
 async function main (argv) {
-  if (!argv.username) {
-    return
-  }
+  try {
+    if (!argv.username) {
+      return
+    }
 
-  const config = {
-    depth: argv.depth || 2,
-    username: argv.username,
-    followers: argv.followers || false,
-    following: argv.following || false
-  }
+    const dataFolder = path.join(process.cwd(), 'data')
+    const isDataFolderCreated = await fsExists(dataFolder)
 
-  await getUser(config)
+    if (!isDataFolderCreated) {
+      try {
+        await fs.mkdir(dataFolder)
+      } catch (err) {
+        throw new Error(err.message)
+      }
+    }
+
+    const config = {
+      depth: argv.depth || 2,
+      username: argv.username,
+      followers: argv.followers || false,
+      following: argv.following || false,
+      dataFolder: dataFolder
+    }
+
+    let args = [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--enable-features=NetworkService'
+    ]
+
+    const browser = await puppeteer.launch({
+      defaultViewport: null,
+      headless: true,
+      args: args
+    })
+
+    const page = (await browser.pages())[0]
+
+    await getUser(page, config)
+
+    await browser.close()
+  } catch (err) {
+    throw err
+  }
 }
 
 main(argv)
   .then(process.exit)
+  .catch((e) => {
+    console.log(e)
+    process.exit(-1)
+  })
