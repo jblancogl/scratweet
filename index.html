@@ -1,0 +1,98 @@
+<html>
+
+<head>
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+  <style type="text/css">
+    html,
+    body {
+      border: 0;
+      padding: 0;
+      margin: 0;
+    }
+
+    #mynetwork {
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      width: calc(100vw - 10px);
+      height: calc(100vh - 10px);
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="mynetwork"></div>
+
+  <script type="text/javascript">
+    function readTextFile(file) {
+      return new Promise((resolve, reject) => {
+        const rawFile = new XMLHttpRequest();
+
+        rawFile.open("GET", file, false);
+        rawFile.onreadystatechange = function () {
+          if (rawFile.readyState === 4) {
+            if (rawFile.status === 200 || rawFile.status == 0) {
+              resolve(rawFile.responseText)
+            }
+          }
+        }
+
+        rawFile.send(null)
+      })
+    }
+
+
+    readTextFile('./network.dot')
+      .then((dot) => {
+        var parsedData = vis.parseDOTNetwork(dot);
+
+        console.log(parsedData.nodes)
+
+        var nodes = new vis.DataSet(parsedData.nodes);
+        var edges = new vis.DataSet(parsedData.edges);
+        // create a network
+        var container = document.getElementById('mynetwork');
+        var data = {
+          nodes: nodes,
+          edges: edges
+        };
+        var options = {
+      nodes: {
+        shape: 'dot',
+        scaling: {
+          min: 10,
+          max: 30
+        },
+        font: {
+          size: 12,
+          face: 'Tahoma'
+        }
+      },
+      edges: {
+        width: 0.15,
+        color: {inherit: 'from'},
+        smooth: {
+          type: 'continuous'
+        }
+      },
+      physics: {
+        stabilization: false,
+        barnesHut: {
+          gravitationalConstant: -80000,
+          springConstant: 0.001,
+          springLength: 200
+        }
+      },
+      interaction: {
+        tooltipDelay: 200,
+        hideEdgesOnDrag: true
+      }
+    };
+        var network = new vis.Network(container, data, options);
+      })
+  </script>
+</body>
+
+</html>

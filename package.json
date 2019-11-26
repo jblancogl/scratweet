@@ -15,8 +15,12 @@
   },
   "homepage": "https://github.com/jblancogl/scratweet#readme",
   "dependencies": {
+    "@dagrejs/graphlib": "^2.1.4",
+    "fast-glob": "^3.1.0",
+    "graphlib-dot": "^0.6.2",
     "luxon": "^1.21.2",
     "puppeteer": "^2.0.0",
+    "queue": "^6.0.1",
     "secure-random-user-agent": "^2.0.1",
     "yargs": "^15.0.2"
   }
