@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const puppeteer = require('puppeteer')
 const agent = require('secure-random-user-agent')
 const { DateTime } = require('luxon')
@@ -51,7 +53,6 @@ async function getProfile (page) {
     console.log(e)
   }
 }
-
 
 async function getDataFromPage (page) {
   try {
@@ -108,8 +109,10 @@ async function fsExists (path) {
   return exists
 }
 
-async function getUser (page, config, depth = 0, blacklist = []) {
+async function getUser (config, depth = 0, blacklist = []) {
   try {
+    const { browser, page } = config 
+
     if (blacklist.includes(config.username)) {
       return
     }
@@ -127,9 +130,10 @@ async function getUser (page, config, depth = 0, blacklist = []) {
     if (isCached) {
       data = JSON.parse((await fs.readFile(filename)))
     } else {
-      await page.goto(`https://twitter.com/${config.username}?lang=en&time=${Date.now()}`)
+      await page.goto(`https://twitter.com/${config.username}?lang=en`)
       data.profile = await getProfile(page)
 
+      const userAgent = await browser.userAgent()
       await page.setUserAgent(agent())
 
       if (config.following) {
@@ -142,6 +146,7 @@ async function getUser (page, config, depth = 0, blacklist = []) {
         data.followers = await scroll(page, getDataFromPage)
       }
 
+      await page.setUserAgent(userAgent)
       await fs.writeFile(filename, JSON.stringify(data, null, 2))
     }
 
@@ -150,7 +155,7 @@ async function getUser (page, config, depth = 0, blacklist = []) {
     if (data.following.length > 0 && depth < config.depth - 1) {
       for (const username of data.following) {
         config.username = username
-        await getUser(page, config, depth + 1, blacklist)
+        await getUser(config, depth + 1, blacklist)
       }
     }
   } catch (e) {
@@ -197,7 +202,10 @@ async function main (argv) {
 
     const page = (await browser.pages())[0]
 
-    await getUser(page, config)
+    config.browser = browser
+    config.page = page
+
+    await getUser(config)
 
     await browser.close()
   } catch (err) {
@@ -211,3 +219,4 @@ main(argv)
     console.log(e)
     process.exit(-1)
   })
+
