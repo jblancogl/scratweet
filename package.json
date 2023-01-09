@@ -15,7 +15,7 @@
   },
   "homepage": "https://github.com/jblancogl/scratweet#readme",
   "dependencies": {
-    "luxon": "^1.21.2",
+    "luxon": "^1.28.1",
     "puppeteer": "^2.0.0",
     "secure-random-user-agent": "^2.0.1",
     "yargs": "^15.0.2"
